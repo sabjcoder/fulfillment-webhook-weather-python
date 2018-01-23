@@ -24,8 +24,11 @@ from urllib.parse import urlparse, urlencode
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError
 
+import urllib
 import json
 import os
+
+from eventregistry import *
 
 from flask import Flask
 from flask import request
