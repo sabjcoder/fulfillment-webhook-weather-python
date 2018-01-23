@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#!/usr/bin/env python
+
 from __future__ import print_function
 from future.standard_library import install_aliases
 install_aliases()
@@ -50,17 +52,70 @@ def webhook():
 
 
 def processRequest(req):
-    if req.get("result").get("action") != "yahooWeatherForecast":
+    print("Request:")
+    print(json.dumps(req, indent=4))
+    if req.get("result").get("action") == "yahooWeatherForecast":
+        baseurl = "https://query.yahooapis.com/v1/public/yql?"
+        yql_query = makeYqlQuery(req)
+        if yql_query is None:
+            return {}
+        yql_url = baseurl + urlencode({'q': yql_query}) + "&format=json"
+        result = urlopen(yql_url).read()
+        data = json.loads(result)
+        res = makeWebhookResult(data)
+    elif req.get("result").get("action") == "getNews":
+        data = req
+        res = makeWebhookResultForGetNews(data)
+    elif req.get("result").get("action") == "getChemicalSymbol":
+        data = req
+        res = makeWebhookResultForGetChemicalSymbol(data)
+    else:
         return {}
-    baseurl = "https://query.yahooapis.com/v1/public/yql?"
-    yql_query = makeYqlQuery(req)
-    if yql_query is None:
-        return {}
-    yql_url = baseurl + urlencode({'q': yql_query}) + "&format=json"
-    result = urlopen(yql_url).read()
-    data = json.loads(result)
-    res = makeWebhookResult(data)
     return res
+
+def makeWebhookResultForGetChemicalSymbol(data):
+    element = data.get("result").get("parameters").get("elementname")
+    chemicalSymbol = 'Unknown'
+    if element == 'Carbon':
+        chemicalSymbol = 'C'
+    elif element == 'Hydrogen':
+        chemicalSymbol = 'H'
+    elif element == 'Nitrogen':
+        chemicalSymbol = 'N'
+    elif element == 'Oxygen':
+        chemicalSymbol = 'O'
+    speech = 'The chemial symbol of '+element+' is '+chemicalSymbol
+
+    return {
+        "speech": speech,
+        "displayText": speech,
+        "source": "webhookdata"
+    }
+
+def makeWebhookResultForGetNews(data):
+    result = req.get("result")
+    parameters = result.get("parameters")
+    keyword = parameters.get("keyword")
+   
+    er = EventRegistry(apiKey = "c9a7f5dc-9fe5-4943-a89f-6486536c9e01")
+    q = QueryArticles(keywords = keyword)
+    q.setRequestedResult(RequestArticlesInfo(count = 1))
+    response = er.execQuery(q)
+    print(response)
+    
+    title = response['articles']['results'][0]['title']
+    url = response['articles']['results'][0]['url']
+    
+    speech = "Here is an article based on " + keyword + " : <" + url + "|" + title + ">"
+    
+    print("Response:")
+    print(speech)
+
+    return {
+        "speech": speech,
+        "displayText": speech,
+        "source": "webhookdata"
+    }
 
 
 def makeYqlQuery(req):
@@ -98,8 +153,8 @@ def makeWebhookResult(data):
 
     # print(json.dumps(item, indent=4))
 
-    speech = "Today the weather in " + location.get('city') + ": " + condition.get('text') + \
-             ", And the temperature is " + condition.get('temp') + " " + units.get('temperature')
+    speech = "Today in " + location.get('city') + ": " + condition.get('text') + \
+             ", the temperature is " + condition.get('temp') + " " + units.get('temperature')
 
     print("Response:")
     print(speech)
